@@ -30,45 +30,13 @@ Chain ID:          8453
 Token decimals:    18
 ```
 
-Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`.
-
-## Optional Read Endpoints
-
-The BirdBets app exposes public read endpoints, but Base MCP `web_request` may not be allowlisted for `birdbets.mykclawd.xyz`. Treat these endpoints as optional context only. If fetching them fails, continue with direct contract reads/calldata construction.
-
-Fetch BirdBets integration context:
-
-```text
-GET https://birdbets.mykclawd.xyz/api/bankr/context
-```
-
-Fetch today's or tomorrow's market snapshot:
-
-```text
-GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Today
-GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow
-```
-
-Fetch a payout preview for a proposed bet:
-
-```text
-GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow&side=YES&stake=10
-GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow&side=NO&stake=10
-```
-
-Fetch recent BirdBuddy visit stats:
-
-```text
-GET https://birdbets.mykclawd.xyz/api/birdbuddy/visits?days=7
-```
-
-Use read endpoints to explain threshold, market status, current odds, pools, payout preview, and close time before preparing a transaction.
+Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`. Do not fetch BirdBets HTTP APIs to determine the market ID. Compute it from the date, or ask the user to confirm the market ID.
 
 ---
 
 ## Direct Contract Reads
 
-Before placing a bet, use Base MCP read-contract capability if available. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads.
+Before placing a bet, use Base MCP read-contract capability. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads. Do not use `web_request`, `web_fetch`, x402 fetch, or browser artifacts to call BirdBets servers.
 
 Read MYKCLAWD:
 
@@ -256,8 +224,8 @@ For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 ```text
 1. Base MCP get_wallets -> choose the Base Account EVM address.
 2. Determine tomorrow's market ID as YYYYMMDD in America/New_York, or ask the user to confirm it.
-3. Optionally fetch BirdBets snapshot for threshold, odds, and payout preview. If blocked, continue.
-4. Read market state, MYKCLAWD balance, and allowance through Base MCP if available.
+3. Read market state, MYKCLAWD balance, and allowance through Base MCP on-chain reads.
+4. Explain threshold, odds from oddsBps, pools, close time, wallet balance, and whether approval is needed.
 5. If MYKCLAWD balance is insufficient, use Base MCP swap to acquire MYKCLAWD.
 6. Build approve calldata if allowance is insufficient.
 7. Build betYes or betNo calldata from marketId and amountWei.
@@ -268,3 +236,5 @@ For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 ```
 
 Do not use BirdBets oracle or admin endpoints. Do not place a bet unless the user explicitly selected side and stake.
+
+Do not call BirdBets HTTP APIs or create a browser/artifact widget to fetch BirdBets data. This plugin is contract-only: Base MCP reads chain state and submits calldata through Base Account.

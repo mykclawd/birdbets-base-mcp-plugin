@@ -2,16 +2,7 @@
 
 Base MCP custom plugin for BirdBets prediction markets.
 
-This repository contains only the plugin spec. The plugin builds BirdBets calldata directly from the market and MYKCLAWD contracts so it can work even when Base MCP cannot fetch custom BirdBets HTTP endpoints.
-
-The BirdBets app also hosts optional read and prepare endpoints:
-
-```text
-GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow
-GET https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<YES|NO>&stake=<decimalMYKCLAWD>
-```
-
-The plugin should prefer direct contract calldata construction. The prepare endpoint can be used when available, but Base MCP may not be allowlisted to fetch it.
+This repository contains only the plugin spec. The plugin is contract-only: it reads BirdBets state from Base contracts, builds calldata directly from the market and MYKCLAWD ABIs, and submits through Base MCP `send_calls`.
 
 ## Plugin
 
@@ -40,8 +31,6 @@ Add this BirdBets markdown file to my Base MCP plugin so it is always available 
 Using the BirdBets plugin, show me tomorrow's market odds and prepare a 10 MYKCLAWD YES bet.
 ```
 
-Claude should complete the Base MCP onboarding gate first by calling `get_wallets`, then use the plugin's contract constants and ABI instructions to build `approve` and `betYes`/`betNo` calldata, submit the ordered calls through Base MCP `send_calls`, and ask you to approve in Base Account.
+Claude should complete the Base MCP onboarding gate first by calling `get_wallets`, then use only Base MCP on-chain reads and the plugin's contract constants/ABI instructions to build `approve` and `betYes`/`betNo` calldata. It should submit the ordered calls through Base MCP `send_calls` and ask you to approve in Base Account.
 
-## Allowlist Caveat
-
-Base's custom plugin docs note that custom plugin HTTP hosts may not be allowlisted for Base MCP `web_request`. This plugin is designed to keep working in that case by building calldata directly from the smart contract ABI. The prepare endpoint is a convenience path, not a requirement.
+The plugin intentionally does not depend on BirdBets HTTP APIs or custom host allowlisting.
