@@ -39,6 +39,24 @@ Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is
 
 ---
 
+## Verified Function Selectors
+
+Use these exact selectors. Do not recompute them, substitute alternatives, or guess if a read reverts.
+
+```text
+balanceOf(address)         = 0x70a08231
+allowance(address,address) = 0xdd62ed3e
+markets(uint256)           = 0xb1283e77
+oddsBps(uint256)           = 0xf2bc1574
+approve(address,uint256)   = 0x095ea7b3
+betYes(uint256,uint256)    = 0x408a2f6a
+betNo(uint256,uint256)     = 0x22a18d42
+```
+
+For `markets(uint256)`, the first 4 bytes must be `0xb1283e77`. Selectors such as `0x4db7b4a9` and `0x9a6b3e47` are wrong for this contract.
+
+---
+
 ## Direct Contract Reads
 
 Before placing a bet, use Base MCP read-contract capability. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads.
@@ -130,6 +148,8 @@ approve(address,uint256) = 0x095ea7b3
 betYes(uint256,uint256) = 0x408a2f6a
 betNo(uint256,uint256) = 0x22a18d42
 ```
+
+Use the verified selectors above for read calls too.
 
 Encode calldata using standard Ethereum ABI encoding:
 
