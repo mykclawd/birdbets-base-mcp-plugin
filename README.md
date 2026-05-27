@@ -33,4 +33,4 @@ Using the BirdBets plugin, show me tomorrow's market odds and prepare a 10 MYKCL
 
 Claude should complete the Base MCP onboarding gate first by calling `get_wallets`, then use only Base MCP on-chain reads and the plugin's contract constants/ABI instructions to build `approve` and `betYes`/`betNo` calldata. It should submit the ordered calls through Base MCP `send_calls` and ask you to approve in Base Account.
 
-The plugin intentionally does not depend on BirdBets HTTP APIs or custom host allowlisting.
+The plugin is Solidity-only. Claude should use Base MCP on-chain reads plus `send_calls`.

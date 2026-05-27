@@ -10,6 +10,11 @@
 > 2. Present wallet status and the normal Base MCP transaction disclaimer.
 > 3. Use the detected wallet address for all balance, allowance, and position reads.
 
+> [!CAUTION]
+> ## SOLIDITY-ONLY PLUGIN
+>
+> This plugin uses only Base MCP on-chain reads and Base MCP `send_calls`. Build calldata from the Solidity ABI and contract constants below.
+
 BirdBets is a prediction market on Base where users bet MYKCLAWD on whether tomorrow's BirdBuddy visit count will be greater than the market threshold. This plugin builds BirdBets contract calldata directly and executes the ordered batch through Base MCP `send_calls`.
 
 **Supported chain:** Base mainnet (`8453`, Base MCP chain name `base`).
@@ -30,13 +35,13 @@ Chain ID:          8453
 Token decimals:    18
 ```
 
-Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`. Do not fetch BirdBets HTTP APIs to determine the market ID. Compute it from the date, or ask the user to confirm the market ID.
+Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`. Compute it from the date, or ask the user to confirm the market ID.
 
 ---
 
 ## Direct Contract Reads
 
-Before placing a bet, use Base MCP read-contract capability. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads. Do not use `web_request`, `web_fetch`, x402 fetch, or browser artifacts to call BirdBets servers.
+Before placing a bet, use Base MCP read-contract capability. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads.
 
 Read MYKCLAWD:
 
@@ -235,6 +240,16 @@ For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 11. On confirmation, report the transaction hash, side, stake, market date, and threshold.
 ```
 
-Do not use BirdBets oracle or admin endpoints. Do not place a bet unless the user explicitly selected side and stake.
+Do not attempt oracle or owner-only contract actions. Do not place a bet unless the user explicitly selected side and stake.
 
-Do not call BirdBets HTTP APIs or create a browser/artifact widget to fetch BirdBets data. This plugin is contract-only: Base MCP reads chain state and submits calldata through Base Account.
+## If You Cannot Read Chain State
+
+If Base MCP cannot perform the read calls, ask the user to confirm:
+
+- Market ID
+- Threshold
+- Whether the market is open
+- MYKCLAWD balance
+- Current allowance
+
+Then build calldata from the constants and ABI in this plugin and submit through `send_calls`.
