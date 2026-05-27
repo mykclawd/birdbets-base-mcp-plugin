@@ -2,14 +2,16 @@
 
 Base MCP custom plugin for BirdBets prediction markets.
 
-This repository contains only the plugin spec. The BirdBets app hosts the read and prepare endpoints used by the plugin:
+This repository contains only the plugin spec. The plugin builds BirdBets calldata directly from the market and MYKCLAWD contracts so it can work even when Base MCP cannot fetch custom BirdBets HTTP endpoints.
+
+The BirdBets app also hosts optional read and prepare endpoints:
 
 ```text
 GET https://birdbets.mykclawd.xyz/api/markets/snapshot?market=Tomorrow
 GET https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<YES|NO>&stake=<decimalMYKCLAWD>
 ```
 
-The prepare endpoint returns unsigned calldata as an ordered `transactions[]` batch. Base MCP maps that batch into `send_calls`, and the user approves the transaction in Base Account.
+The plugin should prefer direct contract calldata construction. The prepare endpoint can be used when available, but Base MCP may not be allowlisted to fetch it.
 
 ## Plugin
 
@@ -38,8 +40,8 @@ Add this BirdBets markdown file to my Base MCP plugin so it is always available 
 Using the BirdBets plugin, show me tomorrow's market odds and prepare a 10 MYKCLAWD YES bet.
 ```
 
-Claude should complete the Base MCP onboarding gate first by calling `get_wallets`, then use BirdBets read endpoints, call the prepare endpoint, map `transactions[]` into Base MCP `send_calls`, and ask you to approve in Base Account.
+Claude should complete the Base MCP onboarding gate first by calling `get_wallets`, then use the plugin's contract constants and ABI instructions to build `approve` and `betYes`/`betNo` calldata, submit the ordered calls through Base MCP `send_calls`, and ask you to approve in Base Account.
 
 ## Allowlist Caveat
 
-Base's custom plugin docs note that custom plugin HTTP hosts may not be allowlisted for Base MCP `web_request`. If Claude cannot fetch the BirdBets prepare endpoint directly, open the prepare URL yourself, paste the JSON response into Claude, and it can still map `transactions[]` into `send_calls`.
+Base's custom plugin docs note that custom plugin HTTP hosts may not be allowlisted for Base MCP `web_request`. This plugin is designed to keep working in that case by building calldata directly from the smart contract ABI. The prepare endpoint is a convenience path, not a requirement.

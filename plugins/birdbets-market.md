@@ -4,13 +4,13 @@
 >
 > ## STOP — COMPLETE BASE MCP ONBOARDING BEFORE USING THIS PLUGIN
 >
-> Before calling any BirdBets prepare endpoint, you MUST complete the Base MCP onboarding flow:
+> Before building or submitting any BirdBets transaction, you MUST complete the Base MCP onboarding flow:
 >
 > 1. Call `get_wallets` to detect the user's Base Account wallet.
 > 2. Present wallet status and the normal Base MCP transaction disclaimer.
-> 3. Use the detected wallet address as the `from` query parameter for every prepare call.
+> 3. Use the detected wallet address for all balance, allowance, and position reads.
 
-BirdBets is a prediction market on Base where users bet MYKCLAWD on whether tomorrow's BirdBuddy visit count will be greater than the market threshold. This plugin fetches BirdBets market state, prepares unsigned approval and bet calldata, then executes the ordered batch through Base MCP `send_calls`.
+BirdBets is a prediction market on Base where users bet MYKCLAWD on whether tomorrow's BirdBuddy visit count will be greater than the market threshold. This plugin builds BirdBets contract calldata directly and executes the ordered batch through Base MCP `send_calls`.
 
 **Supported chain:** Base mainnet (`8453`, Base MCP chain name `base`).
 
@@ -18,7 +18,23 @@ BirdBets is a prediction market on Base where users bet MYKCLAWD on whether tomo
 
 ---
 
-## Read Endpoints
+## Contract Constants
+
+Use these contract addresses unless the user explicitly provides updated BirdBets deployment details:
+
+```text
+Prediction market: 0x79435444379154c49c7cbEd68a371A815EADfa5b
+MYKCLAWD token:    0xE3C5FCfBfea42D5CE2492FD82c239B5503f17ba3
+Chain:             base
+Chain ID:          8453
+Token decimals:    18
+```
+
+Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`.
+
+## Optional Read Endpoints
+
+The BirdBets app exposes public read endpoints, but Base MCP `web_request` may not be allowlisted for `birdbets.mykclawd.xyz`. Treat these endpoints as optional context only. If fetching them fails, continue with direct contract reads/calldata construction.
 
 Fetch BirdBets integration context:
 
@@ -50,90 +66,148 @@ Use read endpoints to explain threshold, market status, current odds, pools, pay
 
 ---
 
-## Prepare Endpoint
+## Direct Contract Reads
 
-Prepare a YES or NO bet for tomorrow's market:
+Before placing a bet, use Base MCP read-contract capability if available. If the exact tool name differs, use the available Base MCP tool for direct on-chain reads.
 
-```text
-GET https://birdbets.mykclawd.xyz/api/base-mcp/prepare/bet?from=<wallet>&side=<YES|NO>&stake=<decimalMYKCLAWD>
-```
-
-Query parameters:
-
-- `from`: detected Base Account EVM wallet address.
-- `side`: `YES` or `NO`.
-- `stake`: human-readable MYKCLAWD amount, for example `10` or `2.5`.
-
-The prepare endpoint validates:
-
-- Tomorrow's market exists.
-- The market is unresolved and open.
-- The wallet has enough MYKCLAWD.
-- Current allowance for the prediction market.
-
-If allowance is insufficient, the response includes an `approve` transaction before the bet transaction.
-
-Response:
+Read MYKCLAWD:
 
 ```json
-{
-  "ok": true,
-  "chain": "base",
-  "chainId": 8453,
-  "from": "0x...",
-  "market": {
-    "label": "Tomorrow",
-    "marketId": "20260528",
-    "marketDate": "2026-05-28",
-    "threshold": "12",
-    "bettingClosesAt": "1780000000",
-    "bettingClosesAtIso": "2026-05-28T04:00:00.000Z"
+[
+  {
+    "type": "function",
+    "name": "balanceOf",
+    "stateMutability": "view",
+    "inputs": [{ "name": "account", "type": "address" }],
+    "outputs": [{ "name": "", "type": "uint256" }]
   },
-  "bet": {
-    "side": "YES",
-    "stake": "10000000000000000000",
-    "stakeFormatted": "10",
-    "token": "MYKCLAWD"
-  },
-  "wallet": {
-    "balance": "50000000000000000000",
-    "balanceFormatted": "50",
-    "allowance": "0",
-    "allowanceFormatted": "0",
-    "requiresApproval": true
-  },
-  "contracts": {
-    "predictionMarket": "0x79435444379154c49c7cbEd68a371A815EADfa5b",
-    "bettingToken": "0xE3C5FCfBfea42D5CE2492FD82c239B5503f17ba3"
-  },
-  "transactions": [
-    {
-      "step": "approve",
-      "to": "0xE3C5FCfBfea42D5CE2492FD82c239B5503f17ba3",
-      "value": "0x0",
-      "data": "0x...",
-      "chainId": 8453,
-      "description": "Approve 10 MYKCLAWD for BirdBets"
-    },
-    {
-      "step": "bet",
-      "to": "0x79435444379154c49c7cbEd68a371A815EADfa5b",
-      "value": "0x0",
-      "data": "0x...",
-      "chainId": 8453,
-      "description": "Bet YES with 10 MYKCLAWD on 2026-05-28"
-    }
-  ]
-}
+  {
+    "type": "function",
+    "name": "allowance",
+    "stateMutability": "view",
+    "inputs": [
+      { "name": "owner", "type": "address" },
+      { "name": "spender", "type": "address" }
+    ],
+    "outputs": [{ "name": "", "type": "uint256" }]
+  }
+]
 ```
 
-If the wallet lacks MYKCLAWD, the endpoint returns `ok: false` with an insufficient-balance message. Use Base MCP `swap` to acquire MYKCLAWD, then call the prepare endpoint again.
+Read BirdBets market:
+
+```json
+[
+  {
+    "type": "function",
+    "name": "markets",
+    "stateMutability": "view",
+    "inputs": [{ "name": "marketId", "type": "uint256" }],
+    "outputs": [
+      { "name": "exists", "type": "bool" },
+      { "name": "resolved", "type": "bool" },
+      { "name": "date", "type": "string" },
+      { "name": "threshold", "type": "uint256" },
+      { "name": "yesPool", "type": "uint256" },
+      { "name": "noPool", "type": "uint256" },
+      { "name": "createdAt", "type": "uint256" },
+      { "name": "bettingClosesAt", "type": "uint256" },
+      { "name": "resolvedAt", "type": "uint256" },
+      { "name": "actualVisits", "type": "uint256" },
+      { "name": "winningSide", "type": "uint8" }
+    ]
+  },
+  {
+    "type": "function",
+    "name": "oddsBps",
+    "stateMutability": "view",
+    "inputs": [{ "name": "marketId", "type": "uint256" }],
+    "outputs": [
+      { "name": "yesBps", "type": "uint256" },
+      { "name": "noBps", "type": "uint256" }
+    ]
+  }
+]
+```
+
+Required checks:
+
+- `markets(marketId).exists === true`
+- `markets(marketId).resolved === false`
+- Current time is before `bettingClosesAt`
+- MYKCLAWD `balanceOf(wallet) >= amountWei`
+- If `allowance(wallet, predictionMarket) < amountWei`, include an approval call before the bet call
+
+If Base MCP cannot do reads, ask the user to confirm market details and token balance, then build calldata from the constants below.
 
 ---
 
+## Build Calldata Directly
+
+Convert the human stake to wei using 18 decimals:
+
+```text
+amountWei = stake * 10^18
+```
+
+Function selectors:
+
+```text
+approve(address,uint256) = 0x095ea7b3
+betYes(uint256,uint256) = 0x408a2f6a
+betNo(uint256,uint256) = 0x22a18d42
+```
+
+Encode calldata using standard Ethereum ABI encoding:
+
+```text
+approve calldata = selector approve + abi.encode(predictionMarket, amountWei)
+YES calldata     = selector betYes + abi.encode(marketId, amountWei)
+NO calldata      = selector betNo + abi.encode(marketId, amountWei)
+```
+
+If the assistant has an ABI encoding tool, use it. If not, construct the calldata by left-padding each `uint256` or address argument to 32 bytes.
+
+Write ABI:
+
+```json
+[
+  {
+    "type": "function",
+    "name": "approve",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "spender", "type": "address" },
+      { "name": "value", "type": "uint256" }
+    ],
+    "outputs": [{ "name": "", "type": "bool" }]
+  },
+  {
+    "type": "function",
+    "name": "betYes",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "marketId", "type": "uint256" },
+      { "name": "amount", "type": "uint256" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "name": "betNo",
+    "stateMutability": "nonpayable",
+    "inputs": [
+      { "name": "marketId", "type": "uint256" },
+      { "name": "amount", "type": "uint256" }
+    ],
+    "outputs": []
+  }
+]
+```
+
 ## send_calls Mapping
 
-Map every `transactions[*]` entry into one Base MCP `send_calls` request:
+Submit calls through Base MCP `send_calls`:
 
 ```json
 {
@@ -153,7 +227,27 @@ Map every `transactions[*]` entry into one Base MCP `send_calls` request:
 }
 ```
 
-Preserve transaction order. `approve` must come before `bet`. If the prepare endpoint returns only one transaction, pass only that call.
+Preserve order. `approve` must come before the bet call. If allowance is already sufficient, omit the approval call.
+
+For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
+
+```json
+{
+  "chain": "base",
+  "calls": [
+    {
+      "to": "0xE3C5FCfBfea42D5CE2492FD82c239B5503f17ba3",
+      "value": "0x0",
+      "data": "0x095ea7b300000000000000000000000079435444379154c49c7cbed68a371a815eadfa5b00000000000000000000000000000000000000000000001b1ae4d6e2ef500000"
+    },
+    {
+      "to": "0x79435444379154c49c7cbEd68a371A815EADfa5b",
+      "value": "0x0",
+      "data": "0x22a18d4200000000000000000000000000000000000000000000000000000000013526b000000000000000000000000000000000000000000000001b1ae4d6e2ef500000"
+    }
+  ]
+}
+```
 
 ---
 
@@ -161,14 +255,16 @@ Preserve transaction order. `approve` must come before `bet`. If the prepare end
 
 ```text
 1. Base MCP get_wallets -> choose the Base Account EVM address.
-2. Fetch /api/markets/snapshot?market=Tomorrow&side=<side>&stake=<stake>.
-3. Explain market threshold, odds, payout preview, and risk.
-4. Fetch /api/base-mcp/prepare/bet?from=<wallet>&side=<side>&stake=<stake>.
-5. If insufficient MYKCLAWD, use Base MCP swap to acquire MYKCLAWD and repeat step 4.
-6. Convert transactions[] into send_calls(chain="base", calls=[...]).
-7. Present Base Account approval URL to the user.
-8. Poll get_request_status(requestId).
-9. On confirmation, report the transaction hash, side, stake, market date, and threshold.
+2. Determine tomorrow's market ID as YYYYMMDD in America/New_York, or ask the user to confirm it.
+3. Optionally fetch BirdBets snapshot for threshold, odds, and payout preview. If blocked, continue.
+4. Read market state, MYKCLAWD balance, and allowance through Base MCP if available.
+5. If MYKCLAWD balance is insufficient, use Base MCP swap to acquire MYKCLAWD.
+6. Build approve calldata if allowance is insufficient.
+7. Build betYes or betNo calldata from marketId and amountWei.
+8. Submit ordered calls through send_calls(chain="base", calls=[...]).
+9. Present Base Account approval URL to the user.
+10. Poll get_request_status(requestId).
+11. On confirmation, report the transaction hash, side, stake, market date, and threshold.
 ```
 
 Do not use BirdBets oracle or admin endpoints. Do not place a bet unless the user explicitly selected side and stake.
