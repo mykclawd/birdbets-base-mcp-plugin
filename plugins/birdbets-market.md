@@ -128,6 +128,7 @@ Required checks:
 - Current time is before `bettingClosesAt`
 - MYKCLAWD `balanceOf(wallet) >= amountWei`
 - If `allowance(wallet, predictionMarket) < amountWei`, include an approval call before the bet call
+- Do not simulate `approve`, `betYes`, or `betNo` with `eth_call` to validate the batch
 
 If Base MCP cannot do reads, ask the user to confirm market details and token balance, then build calldata from the constants below.
 
@@ -160,6 +161,8 @@ NO calldata      = selector betNo + abi.encode(marketId, amountWei)
 ```
 
 If the assistant has an ABI encoding tool, use it. If not, construct the calldata by left-padding each `uint256` or address argument to 32 bytes.
+
+Do not dry-run write calls with `eth_call`. An isolated `eth_call` of `betYes` or `betNo` uses current chain state, so it can revert with `ERC20InsufficientAllowance` when allowance is currently zero. That is a false negative for an atomic `send_calls` batch where `approve` executes before the bet in the same transaction. Only use `eth_call` for view or pure reads.
 
 Write ABI:
 
@@ -222,6 +225,8 @@ Submit calls through Base MCP `send_calls`:
 
 Preserve order. `approve` must come before the bet call. If allowance is already sufficient, omit the approval call.
 
+When approval is needed, submit `approve` and the bet together in a single ordered `send_calls` batch. Do not simulate the bet call separately after constructing the batch.
+
 For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 
 ```json
@@ -254,10 +259,11 @@ For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 5. If MYKCLAWD balance is insufficient, use Base MCP swap to acquire MYKCLAWD.
 6. Build approve calldata if allowance is insufficient.
 7. Build betYes or betNo calldata from marketId and amountWei.
-8. Submit ordered calls through send_calls(chain="base", calls=[...]).
-9. Present Base Account approval URL to the user.
-10. Poll get_request_status(requestId).
-11. On confirmation, report the transaction hash, side, stake, market date, and threshold.
+8. Do not use eth_call to pre-validate write calldata.
+9. Submit ordered calls through send_calls(chain="base", calls=[...]).
+10. Present Base Account approval URL to the user.
+11. Poll get_request_status(requestId).
+12. On confirmation, report the transaction hash, side, stake, market date, and threshold.
 ```
 
 Do not attempt oracle or owner-only contract actions. Do not place a bet unless the user explicitly selected side and stake.
