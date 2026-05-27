@@ -35,7 +35,16 @@ Chain ID:          8453
 Token decimals:    18
 ```
 
-Market IDs use `YYYYMMDD` in the BirdBets timezone. For example, May 28, 2026 is `20260528`. Compute it from the date, or ask the user to confirm the market ID.
+Market IDs use `YYYYMMDD` as a decimal integer in the BirdBets timezone. For example, May 28, 2026 is decimal `20260528`.
+
+When encoding a market ID as ABI calldata, convert that decimal integer to hex exactly:
+
+```text
+20260527 decimal = 0x013526af
+20260528 decimal = 0x013526b0
+```
+
+Do not use `0x01352640` for market `20260528`; that is the wrong value and will read a different, nonexistent market.
 
 ---
 
@@ -54,6 +63,18 @@ betNo(uint256,uint256)     = 0x22a18d42
 ```
 
 For `markets(uint256)`, the first 4 bytes must be `0xb1283e77`. Selectors such as `0x4db7b4a9` and `0x9a6b3e47` are wrong for this contract.
+
+For `markets(20260528)`, use this exact calldata:
+
+```text
+0xb1283e7700000000000000000000000000000000000000000000000000000000013526b0
+```
+
+For `oddsBps(20260528)`, use this exact calldata:
+
+```text
+0xf2bc157400000000000000000000000000000000000000000000000000000000013526b0
+```
 
 ---
 
@@ -254,6 +275,7 @@ For a 500 MYKCLAWD NO bet on market `20260528`, the calls are:
 ```text
 1. Base MCP get_wallets -> choose the Base Account EVM address.
 2. Determine tomorrow's market ID as YYYYMMDD in America/New_York, or ask the user to confirm it.
+   - For May 28, 2026, use decimal `20260528`, encoded as `0x013526b0`.
 3. Read market state, MYKCLAWD balance, and allowance through Base MCP on-chain reads.
 4. Explain threshold, odds from oddsBps, pools, close time, wallet balance, and whether approval is needed.
 5. If MYKCLAWD balance is insufficient, use Base MCP swap to acquire MYKCLAWD.
